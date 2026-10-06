@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Vault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">📸 Memory Vault</div>
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#memories">Memories</a>
+            <a href="#add">Add Memory</a>
+            <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+                <span class="theme-icon">🌙</span>
+            </button>
+        </nav>
+    </header>
+
+    <!-- HOME -->
+    <section id="home" class="hero">
+        <div>
+            <p class="small-title">OUR LITTLE COLLECTION</p>
+            <h1>Memories worth<br>keeping forever.</h1>
+            <p class="description">
+                A simple place for our random moments, laughs,
+                adventures, and memories.
+            </p>
+            <div class="buttons">
+                <a href="#add" class="btn primary">+ Add Memory</a>
+                <button onclick="randomMemory()" class="btn secondary">🎲 Random Memory</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- MEMORIES -->
+    <section id="memories" class="section">
+        <div class="section-header">
+            <div>
+                <p class="small-title">OUR COLLECTION</p>
+                <h2>Recent Memories</h2>
+            </div>
+            <span id="memoryCount">0 memories</span>
+        </div>
+        <div id="memoryGrid" class="memory-grid">
+            <!-- Memories will appear here -->
+        </div>
+    </section>
+
+    <!-- ADD MEMORY -->
+    <section id="add" class="section add-section">
+        <div class="form-container">
+            <p class="small-title">SAVE A MOMENT</p>
+            <h2>Add a Memory</h2>
+            <form id="memoryForm">
+                <label>Photo</label>
+                <input type="file" id="photo" accept="image/*" required>
+
+                <label>Memory Title</label>
+                <input type="text" id="title" placeholder="e.g. Random Night Out" required>
+
+                <label>Caption</label>
+                <textarea id="caption" placeholder="Write something about this memory..." required></textarea>
+
+                <label>Date</label>
+                <input type="date" id="date" required>
+
+                <label>People</label>
+                <input type="text" id="people" placeholder="e.g. Monica, Anna, Lisa">
+
+                <button type="submit" class="btn primary full">Save Memory ❤️</button>
+            </form>
+        </div>
+    </section>
+
+    <!-- RANDOM MEMORY POPUP -->
+    <div id="randomModal" class="modal">
+        <div class="modal-content">
+            <button class="close" onclick="closeRandom()">×</button>
+            <p class="small-title">RANDOM MEMORY</p>
+            <img id="randomImage" src="" alt="Random memory">
+            <h2 id="randomTitle"></h2>
+            <p id="randomCaption"></p>
+            <span id="randomDate"></span>
+        </div>
+    </div>
+
+    <!-- CONFETTI CANVAS -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <footer>
+        <p>Made with ❤️ for our memories. <span style="filter: drop-shadow(0 0 6px #f8bbd0);">✨</span></p>
+    </footer>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
