@@ -1,8 +1,10 @@
 /* ============================================================
-   MEMORY VAULT — with SPARKLES, CONFETTI & DARK MODE
+   MEMORY VAULT — Firebase + ImgBB Version
+   Shared database para makita ng lahat ng friends
    ============================================================ */
 
-let memories = JSON.parse(localStorage.getItem("memories")) || [];
+let memories = [];
+let firebaseReady = false;
 
 const form = document.getElementById("memoryForm");
 const memoryGrid = document.getElementById("memoryGrid");
@@ -12,27 +14,41 @@ const themeIcon = themeToggle.querySelector(".theme-icon");
 const confettiCanvas = document.getElementById("confettiCanvas");
 
 /* ============================================================
-   THEME TOGGLE (Dark Mode)
+   WAIT FOR FIREBASE
    ============================================================ */
-function initTheme() {
-    const saved = localStorage.getItem("theme");
-    if (saved === "dark") {
-        document.body.classList.add("dark-mode");
-        themeIcon.textContent = "☀️";
-    } else {
-        themeIcon.textContent = "🌙";
-    }
-}
-
-themeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    const isDark = document.body.classList.contains("dark-mode");
-    themeIcon.textContent = isDark ? "☀️" : "🌙";
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-
-    // Little sparkle burst on toggle
-    createSparkleBurst(window.innerWidth - 80, 60, 8);
+window.addEventListener("firebase-ready", () => {
+    firebaseReady = true;
+    console.log("🔥 Firebase ready!");
+    loadMemoriesRealtime();
 });
+
+/* ============================================================
+   LOAD MEMORIES — REAL-TIME
+   Auto-update kapag may bagong upload ang friends
+   ============================================================ */
+function loadMemoriesRealtime() {
+    const { collection, query, orderBy, onSnapshot } = window.firebaseFns;
+
+    const q = query(
+        collection(window.db, "memories"),
+        orderBy("createdAt", "desc")
+    );
+
+    onSnapshot(q, (snapshot) => {
+        memories = [];
+        snapshot.forEach((docSnap) => {
+            memories.push({
+                id: docSnap.id,
+                ...docSnap.data()
+            });
+        });
+        displayMemories();
+        console.log("📥 Loaded", memories.length, "memories");
+    }, (error) => {
+        console.error("Error loading:", error);
+        memoryCount.textContent = "Connection error";
+    });
+}
 
 /* ============================================================
    DISPLAY MEMORIES
@@ -54,7 +70,7 @@ function displayMemories() {
         memories.length +
         (memories.length === 1 ? " memory" : " memories");
 
-    memories.forEach((memory, index) => {
+    memories.forEach((memory) => {
         const card = document.createElement("div");
         card.className = "memory-card";
         card.innerHTML = `
@@ -62,6 +78,7 @@ function displayMemories() {
                 src="${memory.image}"
                 class="memory-image"
                 alt="${memory.title}"
+                loading="lazy"
             >
             <div class="memory-info">
                 <h3>${memory.title}</h3>
@@ -71,21 +88,26 @@ function displayMemories() {
                 </span>
                 ${
                     memory.people
-                    ? `<div class="people">
-                        👥 ${memory.people}
-                    </div>`
+                    ? `<div class="people">👥 ${memory.people}</div>`
+                    : ""
+                }
+                ${
+                    memory.author
+                    ? `<div class="people" style="background: rgba(214, 142, 166, 0.4);">
+                        ✍️ by ${memory.author}
+                       </div>`
                     : ""
                 }
                 <div class="card-buttons">
                     <button
                         class="favorite"
-                        onclick="toggleFavorite(${index})"
+                        onclick="toggleFavorite('${memory.id}')"
                     >
                         ${memory.favorite ? "❤️" : "🤍"}
                     </button>
                     <button
                         class="delete"
-                        onclick="deleteMemory(${index})"
+                        onclick="deleteMemory('${memory.id}')"
                     >
                         Delete
                     </button>
@@ -97,85 +119,142 @@ function displayMemories() {
 }
 
 /* ============================================================
-   ADD MEMORY (with Confetti 🎉)
+   ADD MEMORY — Upload sa ImgBB + Save sa Firestore
    ============================================================ */
-form.addEventListener("submit", function(event) {
+form.addEventListener("submit", async function(event) {
     event.preventDefault();
+
+    if (!firebaseReady) {
+        alert("Please wait, connecting to database... ⏳");
+        return;
+    }
 
     const photo = document.getElementById("photo").files[0];
     const title = document.getElementById("title").value;
     const caption = document.getElementById("caption").value;
     const date = document.getElementById("date").value;
     const people = document.getElementById("people").value;
+    const author = document.getElementById("author").value;
 
     if (!photo) {
         alert("Please choose a photo.");
         return;
     }
 
-    const reader = new FileReader();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = "Uploading... ⏳";
+    submitBtn.disabled = true;
 
-    reader.onload = function(e) {
-        const newMemory = {
-            image: e.target.result,
+    try {
+        // STEP 1: I-upload ang image sa ImgBB
+        console.log("📤 Uploading to ImgBB...");
+        const imageUrl = await uploadToImgBB(photo);
+        console.log("✅ Image uploaded:", imageUrl);
+
+        // STEP 2: I-save ang memory data sa Firestore
+        const { collection, addDoc, serverTimestamp } = window.firebaseFns;
+        
+        await addDoc(collection(window.db, "memories"), {
+            image: imageUrl,
             title: title,
             caption: caption,
             date: date,
             people: people,
-            favorite: false
-        };
+            author: author,
+            favorite: false,
+            createdAt: serverTimestamp()
+        });
 
-        memories.unshift(newMemory);
+        console.log("✅ Memory saved to Firestore");
 
-        localStorage.setItem(
-            "memories",
-            JSON.stringify(memories)
-        );
-
+        // STEP 3: Reset form + notification
         form.reset();
-        displayMemories();
-
-        // 🎉 PINK CONFETTI BURST!
         launchPinkConfetti();
 
-        // Small delay before alert so user sees confetti
         setTimeout(() => {
             alert("Memory saved! ❤️");
             window.location.hash = "memories";
         }, 400);
-    };
 
-    reader.readAsDataURL(photo);
+    } catch (error) {
+        console.error("❌ Error:", error);
+        alert("Error saving memory: " + error.message);
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
 });
+
+/* ============================================================
+   UPLOAD TO IMGBB
+   ============================================================ */
+async function uploadToImgBB(file) {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch(
+        `https://api.imgbb.com/1/upload?key=${window.IMGBB_API_KEY}`,
+        {
+            method: "POST",
+            body: formData
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(`ImgBB upload failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+        throw new Error("ImgBB upload unsuccessful");
+    }
+
+    return data.data.url;
+}
 
 /* ============================================================
    DELETE MEMORY
    ============================================================ */
-function deleteMemory(index) {
+async function deleteMemory(memoryId) {
     const confirmDelete = confirm("Delete this memory?");
     if (!confirmDelete) return;
 
-    memories.splice(index, 1);
-    localStorage.setItem("memories", JSON.stringify(memories));
-    displayMemories();
+    try {
+        const { doc, deleteDoc } = window.firebaseFns;
+        await deleteDoc(doc(window.db, "memories", memoryId));
+        console.log("🗑️ Memory deleted");
+    } catch (error) {
+        console.error("Error deleting:", error);
+        alert("Error deleting memory: " + error.message);
+    }
 }
 
 /* ============================================================
-   FAVORITE (with Sparkle ✨)
+   TOGGLE FAVORITE
    ============================================================ */
-function toggleFavorite(index) {
-    memories[index].favorite = !memories[index].favorite;
-    localStorage.setItem("memories", JSON.stringify(memories));
+async function toggleFavorite(memoryId) {
+    try {
+        const { doc, updateDoc } = window.firebaseFns;
+        const memory = memories.find(m => m.id === memoryId);
+        if (!memory) return;
 
-    // Get card position for sparkle burst
-    const cards = document.querySelectorAll(".memory-card");
-    const card = cards[index];
-    if (card) {
-        const rect = card.getBoundingClientRect();
-        createSparkleBurst(rect.left + 40, rect.top + rect.height - 40, 12);
+        await updateDoc(doc(window.db, "memories", memoryId), {
+            favorite: !memory.favorite
+        });
+
+        // Sparkle burst
+        const cards = document.querySelectorAll(".memory-card");
+        const idx = memories.findIndex(m => m.id === memoryId);
+        const card = cards[idx];
+        if (card) {
+            const rect = card.getBoundingClientRect();
+            createSparkleBurst(rect.left + 40, rect.top + rect.height - 40, 12);
+        }
+    } catch (error) {
+        console.error("Error toggling favorite:", error);
     }
-
-    displayMemories();
 }
 
 /* ============================================================
@@ -197,15 +276,11 @@ function randomMemory() {
 
     document.getElementById("randomModal").style.display = "flex";
 
-    // Sparkle burst on modal open
     setTimeout(() => {
         createSparkleBurst(window.innerWidth / 2, window.innerHeight / 2, 15);
     }, 200);
 }
 
-/* ============================================================
-   CLOSE RANDOM MEMORY
-   ============================================================ */
 function closeRandom() {
     document.getElementById("randomModal").style.display = "none";
 }
@@ -218,7 +293,7 @@ window.addEventListener("click", function(e) {
 });
 
 /* ============================================================
-   ✨ SPARKLE BURST EFFECT ✨
+   SPARKLE BURST
    ============================================================ */
 function createSparkleBurst(x, y, count = 10) {
     const sparkleChars = ["✨", "💖", "⭐", "💫", "🌸", "💕"];
@@ -237,7 +312,6 @@ function createSparkleBurst(x, y, count = 10) {
         sparkle.style.filter = "drop-shadow(0 0 8px #f8bbd0)";
         document.body.appendChild(sparkle);
 
-        // Random direction
         const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
         const distance = 60 + Math.random() * 80;
         const dx = Math.cos(angle) * distance;
@@ -253,7 +327,7 @@ function createSparkleBurst(x, y, count = 10) {
 }
 
 /* ============================================================
-   🎉 PINK CONFETTI 🎉
+   PINK CONFETTI
    ============================================================ */
 let confettiParticles = [];
 let confettiAnimationId = null;
@@ -308,8 +382,6 @@ function animateConfetti() {
         p.y += p.speedY;
         p.x += p.speedX;
         p.rotation += p.rotationSpeed;
-
-        // Slight sway
         p.x += Math.sin(p.y * 0.02) * 0.5;
 
         if (p.y < canvas.height + 50) {
@@ -321,7 +393,6 @@ function animateConfetti() {
             ctx.globalAlpha = p.opacity;
             ctx.fillStyle = p.color;
 
-            // Soft glow
             ctx.shadowColor = p.color;
             ctx.shadowBlur = 12;
 
@@ -346,14 +417,34 @@ function animateConfetti() {
     }
 }
 
-// Resize canvas on window resize
 window.addEventListener("resize", () => {
     confettiCanvas.width = window.innerWidth;
     confettiCanvas.height = window.innerHeight;
 });
 
 /* ============================================================
-   INITIAL LOAD
+   THEME TOGGLE
+   ============================================================ */
+function initTheme() {
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") {
+        document.body.classList.add("dark-mode");
+        themeIcon.textContent = "☀️";
+    } else {
+        themeIcon.textContent = "🌙";
+    }
+}
+
+themeToggle.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    const isDark = document.body.classList.contains("dark-mode");
+    themeIcon.textContent = isDark ? "☀️" : "🌙";
+    localStorage.setItem("theme", isDark ? "dark" : "light");
+    createSparkleBurst(window.innerWidth - 80, 60, 8);
+});
+
+/* ============================================================
+   INIT
    ============================================================ */
 initTheme();
-displayMemories();
+console.log("🚀 Memory Vault initializing...");

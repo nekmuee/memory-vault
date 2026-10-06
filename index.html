@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memory Vault</title>
+    <title>Memory Vault · pink metallic</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
@@ -47,7 +47,7 @@
                 <p class="small-title">OUR COLLECTION</p>
                 <h2>Recent Memories</h2>
             </div>
-            <span id="memoryCount">0 memories</span>
+            <span id="memoryCount">Loading...</span>
         </div>
         <div id="memoryGrid" class="memory-grid">
             <!-- Memories will appear here -->
@@ -75,6 +75,9 @@
                 <label>People</label>
                 <input type="text" id="people" placeholder="e.g. Monica, Anna, Lisa">
 
+                <label>Your Name</label>
+                <input type="text" id="author" placeholder="e.g. Nics" required>
+
                 <button type="submit" class="btn primary full">Save Memory ❤️</button>
             </form>
         </div>
@@ -99,6 +102,56 @@
         <p>Made with ❤️ for our memories. <span style="filter: drop-shadow(0 0 6px #f8bbd0);">✨</span></p>
     </footer>
 
+    <!-- ============================================
+         FIREBASE SDK
+         ============================================ -->
+    <script type="module">
+        // Import Firebase functions
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            deleteDoc, 
+            doc, 
+            updateDoc, 
+            query, 
+            orderBy, 
+            serverTimestamp,
+            onSnapshot
+        } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+        // 🔑 Firebase Config (from your Firebase project)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA8_TZKlbsjgo4uVB0hLQf0PCaSMqU6tMQ",
+            authDomain: "memory-vault-efdf6.firebaseapp.com",
+            projectId: "memory-vault-efdf6",
+            storageBucket: "memory-vault-efdf6.firebasestorage.app",
+            messagingSenderId: "87797023102",
+            appId: "1:87797023102:web:c71714d91911cf0b9f732f"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // 🔑 ImgBB API Key (from your ImgBB account)
+        const IMGBB_API_KEY = "9ae1d73250975e54ed8072005f9b9fae";
+
+        // Expose sa global scope para magamit ng script.js
+        window.db = db;
+        window.IMGBB_API_KEY = IMGBB_API_KEY;
+        window.firebaseFns = {
+            collection, addDoc, getDocs, deleteDoc, doc,
+            updateDoc, query, orderBy, serverTimestamp, onSnapshot
+        };
+
+        // Dispatch event kapag ready na ang Firebase
+        window.dispatchEvent(new Event("firebase-ready"));
+    </script>
+    
+    <!-- Your existing script -->
     <script src="script.js"></script>
 
 </body>
